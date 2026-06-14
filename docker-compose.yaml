@@ -1,0 +1,23 @@
+---
+services:
+  backup:
+    build: .
+    image: homelab-service-backup:latest
+    container_name: homelab-backup
+    ports:
+      - 8787:8000
+    environment:
+      TZ: Europe/Sofia
+      # Optional: provide the token via env instead of the UI.
+      # GITHUB_TOKEN: ${GITHUB_TOKEN}
+    volumes:
+      # The directory that holds all your service folders (read-write so we can restore).
+      - /opt:/services
+      # Persistent state: git history, SQLite settings, logs.
+      - backup_data:/data
+      # Allows the service to stop/start containers during a restore.
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+volumes:
+  backup_data:
