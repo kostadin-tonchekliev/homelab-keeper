@@ -27,7 +27,7 @@ class Settings(SQLModel, table=True):
     # Token stored here overrides the GITHUB_TOKEN env var. Never committed.
     github_token: str | None = None
 
-    git_author_name: str = "Homelab Backup"
+    git_author_name: str = "Homelab Keeper"
     git_author_email: str = "backup@homelab.local"
 
     sync_mode: SyncMode = SyncMode.hybrid
