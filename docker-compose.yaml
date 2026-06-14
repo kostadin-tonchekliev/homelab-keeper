@@ -2,7 +2,7 @@
 services:
   backup:
     build: .
-    image: homelab-service-backup:latest
+    image: homelab-keeper:latest
     container_name: homelab-backup
     ports:
       - 8787:8000
