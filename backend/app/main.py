@@ -17,6 +17,20 @@ from .core.scheduler import scheduler_manager
 from .core.watcher import watcher_manager
 from .db import get_settings, init_db, session_scope
 
+# Resolve VERSION file: check next to the package root (works in Docker where
+# backend/ is copied to /app/) and then one level higher (local repo root).
+def _read_version() -> str:
+    for candidate in [
+        Path(__file__).parent.parent / "VERSION",
+        Path(__file__).parent.parent.parent / "VERSION",
+    ]:
+        if candidate.is_file():
+            return candidate.read_text().strip()
+    return "unknown"
+
+
+APP_VERSION = _read_version()
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
@@ -57,6 +71,11 @@ app.include_router(api_router)
 @app.get("/healthz", response_class=PlainTextResponse)
 def healthz():
     return "ok"
+
+
+@app.get("/version")
+def version():
+    return {"version": APP_VERSION}
 
 
 @app.get("/metrics", response_class=PlainTextResponse)

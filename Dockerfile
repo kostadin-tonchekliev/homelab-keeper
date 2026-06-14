@@ -26,6 +26,7 @@ COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ ./
+COPY VERSION ./
 COPY --from=frontend /app/frontend/dist ./app/static
 
 ENV DATA_DIR=/data \
