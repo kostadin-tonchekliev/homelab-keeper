@@ -39,52 +39,57 @@ A backup = `git add -A` -> `git commit` -> `git push` (HTTPS + PAT). Exclusions
 are written to `repo.git/info/exclude`, so your real service folders stay clean.
 Restore = `git checkout <commit> -- <path>`.
 
-## Quick start
+## Quick setup
 
-1. Edit [`docker-compose.yaml`](docker-compose.yaml):
+1. Download [`docker-compose.yaml`](docker-compose.yaml):
+
+   ```bash
+   curl -O https://raw.githubusercontent.com/kostadin-tonchekliev/homelab-keeper/main/docker-compose.yaml
+   ```
+
+2. Adjust the settings to your environment:
    - Map your services base directory to `/services` (default `/opt:/services`).
-   - Adjust the published port (default `8787`) and `TZ` if needed.
-2. Build and run:
+   - Update the published port (default `8787`) and `TZ` if needed.
+
+3. Start the container:
 
    ```bash
-   docker compose up -d --build
+   docker compose up -d
    ```
 
-   To rebuild the image after updating source files without restarting immediately:
-
-   ```bash
-   docker compose build
-   ```
-
-   Or to rebuild and restart in one step (zero-downtime swap — `/data` volume is
-   preserved):
-
-   ```bash
-   docker compose up -d --build
-   ```
-
-3. Open `http://<server-ip>:8787` and go to **Settings**:
+4. Open `http://<server-ip>:8787` and go to **Settings**:
    - Set the **GitHub repository URL** (must be a **private** repo).
    - Paste a **fine-grained Personal Access Token** with `Contents: read & write`
      on that repo.
    - Choose your sync mode/interval, then click **Connect & initialise**.
-4. Go to **Services** and toggle off any large data directories you don't want
+
+5. Go to **Services** and toggle off any large data directories you don't want
    backed up.
-5. Hit **Back up now** on the Dashboard for the first commit.
+
+6. Hit **Back up now** on the Dashboard for the first commit.
 
 > The repo will contain real secrets (auth files, keys, sqlite DBs) backed up
 > as-is, so it **must stay private**.
 
-## Updating after source changes
+## Building your own image
 
-After pulling new changes or editing source files, rebuild the image and restart
-the container:
+Clone the repo and build the image locally:
 
 ```bash
-# Rebuild image only (does not restart the running container)
-docker compose build
+git clone https://github.com/kostadin-tonchekliev/homelab-keeper.git
+cd homelab-keeper
+docker compose up -d --build
+```
 
-# Rebuild and restart in one step (recommended — /data volume is preserved)
+To rebuild after making source changes without restarting:
+
+```bash
+docker compose build
+```
+
+To rebuild and restart in one step (`/data` volume is preserved):
+
+```bash
 docker compose up -d --build
 ```
 
