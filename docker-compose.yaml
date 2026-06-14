@@ -3,7 +3,7 @@ services:
   backup:
     build: .
     image: ktonchekliev/homelab-keeper:latest
-    container_name: homelab-backup
+    container_name: homelab-keeper
     ports:
       - 8787:8000
     environment:

@@ -189,17 +189,23 @@ export function Dashboard() {
 
   return (
     <>
-      <div className="row between">
+      <div className="row between" style={{ marginBottom: 28 }}>
         <div>
-          <h1 className="page-title">Dashboard</h1>
-          <p className="page-sub">
+          <h1 className="page-title" style={{ marginBottom: 8 }}>Dashboard</h1>
+          <p className="page-sub" style={{ margin: 0 }}>
             Branch <span className="mono">{status.branch}</span>
           </p>
         </div>
-        <span className={`badge ${activity}`}>
-          <span className="dot" />
-          {activity}
-        </span>
+        <div className="row">
+          <span className={`badge ${activity}`}>
+            <span className="dot" />
+            {activity}
+          </span>
+          <button className="btn" onClick={doBackup} disabled={busy}>
+            <BackupIcon />
+            {busy ? "Backing up…" : "Back up now"}
+          </button>
+        </div>
       </div>
 
       {status.last_error && (
@@ -268,7 +274,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="grid cols-3" style={{ marginBottom: 24 }}>
+      <div className="grid cols-3">
         <div className="card">
           <h3>Repository size</h3>
           <div className="stat">{formatBytes(status.repo_size_bytes)}</div>
@@ -289,12 +295,15 @@ export function Dashboard() {
           <div className="stat-sub">used for restore stop/start</div>
         </div>
       </div>
-
-      <div className="row">
-        <button className="btn" onClick={doBackup} disabled={busy}>
-          Back up now
-        </button>
-      </div>
     </>
+  );
+}
+
+function BackupIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12a9 9 0 1 1-3-6.7L21 8" />
+      <path d="M21 3v5h-5" />
+    </svg>
   );
 }
