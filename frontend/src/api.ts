@@ -34,7 +34,6 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ message }),
     }),
-  push: () => req<{ ok: boolean }>("/api/push", { method: "POST" }),
   unlock: () => req<{ ok: boolean; removed: string[] }>("/api/unlock", { method: "POST" }),
   fetch: () => req<{ ok: boolean }>("/api/fetch", { method: "POST" }),
   history: (limit = 100) => req<Commit[]>(`/api/history?limit=${limit}`),

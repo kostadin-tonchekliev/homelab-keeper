@@ -148,18 +148,6 @@ export function Dashboard() {
     }
   };
 
-  const doPush = async () => {
-    setBusy(true);
-    try {
-      await api.push();
-      toast("Pushed to remote", "success");
-      await load();
-    } catch (e) {
-      toast(String((e as Error).message), "error");
-    } finally {
-      setBusy(false);
-    }
-  };
 
   if (!status) {
     return (
@@ -305,9 +293,6 @@ export function Dashboard() {
       <div className="row">
         <button className="btn" onClick={doBackup} disabled={busy}>
           Back up now
-        </button>
-        <button className="btn secondary" onClick={doPush} disabled={busy}>
-          Push now
         </button>
       </div>
     </>
