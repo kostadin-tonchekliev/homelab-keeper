@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="frontend/public/icon.png" alt="Homelab Keeper logo" width="120" height="120" />
+  <img src="frontend/public/icon.svg" alt="Homelab Keeper logo" width="120" height="120" />
 </p>
 
 <h1 align="center">Homelab Service Backup</h1>
