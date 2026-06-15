@@ -5,7 +5,7 @@ from threading import Lock
 from ..db import get_settings, session_scope
 from .docker_client import compose_down, compose_up, list_compose_projects
 from .excludes import apply_excludes
-from .git_service import GitError, git_service
+from .git_service import BackupResult, GitError, git_service
 from .logbus import log_bus
 from .manifest import write_manifest
 from .notify import notify
@@ -39,7 +39,7 @@ def run_backup(message: str | None = None, reason: str = "manual") -> dict:
             apply_excludes(session)
             write_manifest(settings.services_dir)
             try:
-                commit = git_service.backup(settings, message=message)
+                result: BackupResult = git_service.backup(settings, message=message)
             except GitError as exc:
                 state["status"] = "error"
                 state["last_error"] = str(exc)
@@ -48,9 +48,13 @@ def run_backup(message: str | None = None, reason: str = "manual") -> dict:
 
             state["status"] = "idle"
             state["last_error"] = None
-            if commit is None:
+            if result.commit is None:
                 log_bus.info(f"No changes to back up ({reason}).")
-                return {"ok": True, "changed": False}
+                return {
+                    "ok": True,
+                    "changed": False,
+                    "skipped_files": result.skipped_large_files,
+                }
 
             from datetime import datetime, timezone
 
@@ -58,10 +62,15 @@ def run_backup(message: str | None = None, reason: str = "manual") -> dict:
             notify(
                 settings,
                 "Backup complete",
-                f"{commit.short_sha} {commit.subject}",
+                f"{result.commit.short_sha} {result.commit.subject}",
                 success=True,
             )
-            return {"ok": True, "changed": True, "commit": commit.short_sha}
+            return {
+                "ok": True,
+                "changed": True,
+                "commit": result.commit.short_sha,
+                "skipped_files": result.skipped_large_files,
+            }
     finally:
         # Re-enable the watcher and discard any debounce timer that was
         # scheduled before suppression took effect (e.g. from events that

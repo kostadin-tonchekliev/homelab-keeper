@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="frontend/public/icon.png" alt="Homelab Keeper logo" width="120" height="120" />
+  <img src="https://img.shields.io/badge/Built%20with-Cursor-000000?style=for-the-badge&logo=cursor&logoColor=white" alt="Built with Cursor" />
+</p>
+
+<p align="center">
+  <img src="frontend/public/icon.svg" alt="Homelab Keeper logo" width="120" height="120" />
 </p>
 
 <h1 align="center">Homelab Service Backup</h1>
@@ -10,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-1.1.0-6366f1?style=for-the-badge" />
+  <img alt="Version" src="https://img.shields.io/badge/version-1.2.0-6366f1?style=for-the-badge" />
   <img alt="Docker" src="https://img.shields.io/badge/Docker-ready-2496ED?style=for-the-badge&logo=docker&logoColor=white" />
   <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-backend-009688?style=for-the-badge&logo=fastapi&logoColor=white" />
   <img alt="React" src="https://img.shields.io/badge/React-frontend-61DAFB?style=for-the-badge&logo=react&logoColor=black" />

@@ -449,6 +449,11 @@ a {
   box-shadow: 0 0 8px var(--amber);
   animation: pulse-dot 1.2s ease-in-out infinite;
 }
+.badge.amber {
+  background: var(--amber-soft);
+  color: var(--amber);
+  border-color: transparent;
+}
 .badge.error {
   background: var(--red-soft);
   color: var(--red);

@@ -69,3 +69,11 @@ export interface CommitFile {
   removed: string;
   path: string;
 }
+
+export interface BrowseItem {
+  name: string;
+  rel_path: string;
+  is_dir: boolean;
+  size_bytes: number;
+  excluded: boolean;
+}
