@@ -222,13 +222,47 @@ a {
 .main {
   overflow-y: auto;
   height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .main-inner {
-  padding: 40px 44px 64px;
+  padding: 40px 44px 40px;
   max-width: 1180px;
+  width: 100%;
   margin: 0 auto;
   animation: fade-in 0.3s ease;
+  flex: 1;
+}
+
+.app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 14px 44px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.app-footer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-faint);
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.app-footer-link:hover {
+  color: var(--text-dim);
+}
+
+.app-footer-version {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text-faint);
 }
 
 @keyframes fade-in {
@@ -858,7 +892,10 @@ label {
     height: auto;
   }
   .main-inner {
-    padding: 28px 20px 48px;
+    padding: 28px 20px 32px;
+  }
+  .app-footer {
+    padding: 12px 20px;
   }
   .grid.cols-3,
   .grid.cols-2 {
