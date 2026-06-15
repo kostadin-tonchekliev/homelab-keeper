@@ -1,4 +1,8 @@
 <p align="center">
+  <img src="https://img.shields.io/badge/Built%20with-Cursor-000000?style=for-the-badge&logo=cursor&logoColor=white" alt="Built with Cursor" />
+</p>
+
+<p align="center">
   <img src="frontend/public/icon.png" alt="Homelab Keeper logo" width="120" height="120" />
 </p>
 
