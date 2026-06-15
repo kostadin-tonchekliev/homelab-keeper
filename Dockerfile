@@ -4,6 +4,7 @@ WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm install
 COPY frontend/ ./
+COPY VERSION /app/VERSION
 RUN npm run build
 
 # ---- Stage 2: Python runtime serving API + static assets ----
