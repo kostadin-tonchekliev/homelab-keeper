@@ -1,4 +1,5 @@
 import type {
+  BrowseItem,
   Commit,
   CommitFile,
   LogEntry,
@@ -30,10 +31,10 @@ async function req<T>(url: string, options?: RequestInit): Promise<T> {
 export const api = {
   status: () => req<RepoStatus>("/api/status"),
   backup: (message?: string) =>
-    req<{ ok: boolean; changed?: boolean; commit?: string }>("/api/backup", {
-      method: "POST",
-      body: JSON.stringify({ message }),
-    }),
+    req<{ ok: boolean; changed?: boolean; commit?: string; skipped_files?: string[] }>(
+      "/api/backup",
+      { method: "POST", body: JSON.stringify({ message }) },
+    ),
   unlock: () => req<{ ok: boolean; removed: string[] }>("/api/unlock", { method: "POST" }),
   fetch: () => req<{ ok: boolean }>("/api/fetch", { method: "POST" }),
   history: (limit = 100) => req<Commit[]>(`/api/history?limit=${limit}`),
@@ -72,4 +73,6 @@ export const api = {
       body: JSON.stringify({ sha, paths }),
     }),
   logs: (limit = 200) => req<LogEntry[]>(`/api/logs?limit=${limit}`),
+  browse: (path: string) =>
+    req<{ items: BrowseItem[] }>(`/api/browse?path=${encodeURIComponent(path)}`),
 };

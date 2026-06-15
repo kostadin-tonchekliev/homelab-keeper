@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
 
 from ..config import get_config
 from ..core import docker_client
-from ..core.discovery import discover_services
+from ..core.discovery import _dir_size_shallow, discover_services
 from ..core.excludes import apply_excludes
 from ..core.git_service import GitError, git_service
 from ..core.logbus import log_bus
@@ -193,6 +194,47 @@ def toggle_exclude(body: ExcludeToggle, session: Session = Depends(get_session))
     session.commit()
     apply_excludes(session)
     return {"ok": True}
+
+
+@router.get("/browse")
+def browse_dir(path: str = Query(...), session: Session = Depends(get_session)):
+    """List the direct children (files + subdirs) of a path inside services_dir."""
+    settings = get_settings(session)
+    services_base = Path(settings.services_dir).resolve()
+    target = (services_base / path.strip("/")).resolve()
+
+    # Guard against path-traversal attempts.
+    if not str(target).startswith(str(services_base) + "/") and target != services_base:
+        raise HTTPException(status_code=400, detail="Invalid path")
+    if not target.is_dir():
+        raise HTTPException(status_code=404, detail="Not a directory")
+
+    excl_rows = {e.path: e for e in session.exec(select(ExcludeRule)).all()}
+    rel_prefix = path.strip("/")
+
+    items = []
+    dirs, files = [], []
+    for entry in target.iterdir():
+        if entry.name.startswith("."):
+            continue
+        (dirs if entry.is_dir() and not entry.is_symlink() else files).append(entry)
+
+    for entry in sorted(dirs) + sorted(files):
+        rel = f"{rel_prefix}/{entry.name}"
+        is_dir = entry.is_dir() and not entry.is_symlink()
+        try:
+            size = _dir_size_shallow(entry) if is_dir else entry.stat().st_size
+        except OSError:
+            size = -1
+        excluded = bool(excl_rows.get(rel) and excl_rows[rel].enabled)
+        items.append({
+            "name": entry.name,
+            "rel_path": rel,
+            "is_dir": is_dir,
+            "size_bytes": size,
+            "excluded": excluded,
+        })
+    return {"items": items}
 
 
 # ----- settings -------------------------------------------------------------

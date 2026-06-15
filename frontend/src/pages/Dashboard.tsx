@@ -5,6 +5,58 @@ import { useToast } from "../components/Toast";
 import { formatBytes, formatDate, timeAgo } from "../lib/format";
 import type { LogEntry, RepoStatus } from "../types";
 
+// ---- Skipped-files warning --------------------------------------------------
+function SkippedFilesWarning({
+  files,
+  onDismiss,
+}: {
+  files: string[];
+  onDismiss: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="card" style={{ borderColor: "var(--amber)", marginBottom: 16 }}>
+      <div className="row between" style={{ marginBottom: 6 }}>
+        <h3 className="amber" style={{ margin: 0 }}>
+          {files.length} file{files.length !== 1 ? "s" : ""} skipped — over 100 MB
+        </h3>
+        <button
+          className="btn secondary small"
+          onClick={onDismiss}
+          aria-label="Dismiss"
+        >
+          ✕
+        </button>
+      </div>
+      <p className="muted" style={{ margin: "0 0 8px", fontSize: 13 }}>
+        These files exceed GitHub's 100&nbsp;MB per-file limit and were automatically
+        excluded from this commit. To stop seeing this notice, exclude them on
+        the{" "}
+        <Link to="/services" style={{ color: "var(--accent)" }}>
+          Services page
+        </Link>
+        .
+      </p>
+      <button
+        className="btn secondary small"
+        onClick={() => setExpanded((v) => !v)}
+        style={{ marginBottom: expanded ? 8 : 0 }}
+      >
+        {expanded ? "Hide paths ▲" : `Show paths ▼`}
+      </button>
+      {expanded && (
+        <ul style={{ margin: "4px 0 0", paddingLeft: 20 }}>
+          {files.map((f) => (
+            <li key={f} className="mono" style={{ fontSize: 12, lineHeight: 1.7 }}>
+              {f}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 // ---- Step detection logic --------------------------------------------------
 // Steps transition by matching log messages emitted by the backend at the
 // START of each operation (so the UI advances as each phase begins, not after
@@ -86,6 +138,7 @@ export function Dashboard() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [backupLogs, setBackupLogs] = useState<LogEntry[]>([]);
+  const [skippedFiles, setSkippedFiles] = useState<string[]>([]);
   const pollRef = useRef<number | null>(null);
   const toast = useToast();
 
@@ -131,9 +184,13 @@ export function Dashboard() {
   const doBackup = async () => {
     setBusy(true);
     setBackupLogs([]);
+    setSkippedFiles([]);
     startLogPolling();
     try {
       const res = await api.backup();
+      if (res.skipped_files && res.skipped_files.length > 0) {
+        setSkippedFiles(res.skipped_files);
+      }
       toast(
         res.changed ? `Backup committed (${res.commit})` : "No changes to back up",
         "success",
@@ -243,6 +300,13 @@ export function Dashboard() {
       )}
 
       {busy && <BackupProgress logs={backupLogs} />}
+
+      {skippedFiles.length > 0 && (
+        <SkippedFilesWarning
+          files={skippedFiles}
+          onDismiss={() => setSkippedFiles([])}
+        />
+      )}
 
       <div className="grid cols-3" style={{ marginBottom: 16 }}>
         <div className="card">

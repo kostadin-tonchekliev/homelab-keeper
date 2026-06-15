@@ -28,6 +28,12 @@ class Commit:
 
 
 @dataclass
+class BackupResult:
+    commit: Commit | None
+    skipped_large_files: list[str]
+
+
+@dataclass
 class RepoStatus:
     initialized: bool
     branch: str
@@ -201,6 +207,10 @@ class GitService:
 
             self._run(settings, "config", "core.fileMode", "false")
             self._run(settings, "config", "gc.auto", "0")
+            # Large service directories can exceed git's 1 MB default post
+            # buffer, causing GitHub to return HTTP 408 mid-push.  500 MB is
+            # enough for typical homelab repos.
+            self._run(settings, "config", "http.postBuffer", "524288000")
 
             # (Re)point origin at the configured URL (without the token).
             self._run(settings, "remote", "remove", "origin", check=False)
@@ -290,19 +300,160 @@ class GitService:
             clean=pending == 0,
         )
 
+    # ----- large-file helpers ------------------------------------------------
+    # GitHub rejects any single blob that exceeds this size.
+    _GITHUB_MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
+
+    def _unstage_oversized_files(self, settings: Settings) -> list[str]:
+        """Remove files that exceed GitHub's 100 MB hard limit from the index.
+
+        Called after ``git add -A`` so that oversized files are never included
+        in a commit.  Returns the list of relative paths that were dropped.
+        """
+        proc = self._run(settings, "diff", "--cached", "--name-only", check=False)
+        if not proc.stdout.strip():
+            return []
+
+        services_dir = Path(settings.services_dir)
+        oversized: list[str] = []
+        for rel in proc.stdout.splitlines():
+            rel = rel.strip()
+            if not rel:
+                continue
+            try:
+                if (services_dir / rel).stat().st_size > self._GITHUB_MAX_FILE_SIZE:
+                    oversized.append(rel)
+            except OSError:
+                pass
+
+        if not oversized:
+            return []
+
+        for path in oversized:
+            self._run(settings, "rm", "--cached", "--", path, check=False)
+
+        log_bus.warning(
+            f"Skipped {len(oversized)} file(s) that exceed GitHub's 100 MB limit. "
+            "Add them to the Services exclusions list to suppress this warning:"
+        )
+        for path in oversized:
+            log_bus.warning(f"  \u2022 {path}")
+        return oversized
+
+    @staticmethod
+    def _parse_github_large_file_paths(err: str) -> list[str]:
+        """Extract file paths from a GitHub GH001 large-file rejection message."""
+        import re
+
+        return re.findall(r"remote: error: File (.+?) is [\d.]+ MB;", err)
+
+    def _strip_large_files_from_unpushed_history(
+        self, settings: Settings, paths: list[str]
+    ) -> None:
+        """Rewrite all unpushed local commits into one commit without *paths*.
+
+        Strategy:
+        - If the remote branch already exists: soft-reset HEAD to
+          ``origin/<branch>``, collapsing all local-only commits back into the
+          staging area, remove the large files, and re-commit.
+        - If there is no remote branch yet (first push ever): soft-squash all
+          commits after the root into the root via ``reset --soft HEAD~(n-1)``,
+          then amend the root commit without the large files.
+        """
+        has_remote = (
+            self._run(
+                settings,
+                "rev-parse",
+                "--verify",
+                f"origin/{settings.branch}",
+                check=False,
+            ).returncode
+            == 0
+        )
+
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+        if has_remote:
+            self._run(settings, "reset", "--soft", f"origin/{settings.branch}")
+            for p in paths:
+                self._run(settings, "rm", "--cached", "--", p, check=False)
+            self._run(
+                settings,
+                "commit",
+                "-m",
+                f"Backup {now} (large files auto-excluded)",
+            )
+        else:
+            n = int(
+                self._run(
+                    settings, "rev-list", "--count", "HEAD", check=False
+                ).stdout.strip()
+                or "1"
+            )
+            if n > 1:
+                # Collapse commits 2…n back onto root so the index holds the
+                # full current state; then amend root to drop the large files.
+                self._run(settings, "reset", "--soft", f"HEAD~{n - 1}")
+            for p in paths:
+                self._run(settings, "rm", "--cached", "--", p, check=False)
+            self._run(
+                settings,
+                "commit",
+                "--amend",
+                "-m",
+                f"Backup {now} (large files auto-excluded)",
+            )
+
+        log_bus.warning(
+            f"Rewrote local commit history to remove {len(paths)} large file(s). "
+            "Add them to the Services exclusions to prevent this on future backups."
+        )
+
     # ----- backup / push -----------------------------------------------------
-    def backup(self, settings: Settings, message: str | None = None) -> Commit | None:
+
+    # When a file is actively written by a running container (e.g. a live
+    # SQLite database) git can detect a hash mismatch mid-index and bail with
+    # "confused by unstable object source data".  A short wait and retry is
+    # enough in practice because the write burst settles quickly.
+    _ADD_RETRIES = 3
+    _ADD_RETRY_DELAY = 3  # seconds between attempts
+
+    def backup(self, settings: Settings, message: str | None = None) -> BackupResult:
         with self._lock:
             if not self.is_initialized():
                 self.init_repo(settings)
 
             log_bus.info("Staging: running git add -A (may take a moment for large trees)…")
-            self._run(settings, "add", "-A")
+            for attempt in range(1, self._ADD_RETRIES + 1):
+                proc = self._run(settings, "add", "-A", check=False)
+                if proc.returncode == 0:
+                    break
+                err_text = proc.stderr.strip() or proc.stdout.strip()
+                if "confused by unstable object source data" in err_text:
+                    if attempt < self._ADD_RETRIES:
+                        log_bus.warning(
+                            f"Staging: a file changed mid-index (attempt {attempt}/{self._ADD_RETRIES}), "
+                            f"retrying in {self._ADD_RETRY_DELAY}s… "
+                            "(a running container is writing to the file — consider excluding it)"
+                        )
+                        time.sleep(self._ADD_RETRY_DELAY)
+                    else:
+                        raise GitError(
+                            f"git add -A failed after {self._ADD_RETRIES} attempts — "
+                            "a file is being actively written by a running container. "
+                            f"Exclude it on the Services page to prevent this. Details: {err_text}"
+                        )
+                else:
+                    raise GitError(f"git add -A failed ({proc.returncode}): {err_text}")
+
+            # Drop oversized files before we even look at the staged count so
+            # that GitHub's 100 MB per-file limit is never hit at push time.
+            skipped = self._unstage_oversized_files(settings)
 
             staged = self._run(settings, "diff", "--cached", "--name-only", check=False)
             if not staged.stdout.strip():
                 log_bus.info("Staging complete: no changes to commit.")
-                return None
+                return BackupResult(commit=None, skipped_large_files=skipped)
 
             count = len([ln for ln in staged.stdout.splitlines() if ln.strip()])
             log_bus.info(f"Staging complete: {count} file(s) changed. Creating commit…")
@@ -315,7 +466,7 @@ class GitService:
 
             if settings.auto_push and settings.repo_url.strip():
                 self.push(settings)
-            return commit
+            return BackupResult(commit=commit, skipped_large_files=skipped)
 
     def push(self, settings: Settings) -> None:
         with self._lock:
@@ -326,6 +477,27 @@ class GitService:
             )
             if proc.returncode != 0:
                 err = self._redact(proc.stderr.strip(), settings)
+                large_files = self._parse_github_large_file_paths(err)
+                if large_files:
+                    log_bus.warning(
+                        f"Push rejected: {len(large_files)} file(s) exceed GitHub's "
+                        "100 MB limit. Rewriting local history to remove them…"
+                    )
+                    self._strip_large_files_from_unpushed_history(settings, large_files)
+                    # Retry with cleaned history.
+                    proc = self._run(
+                        settings,
+                        "push",
+                        authed,
+                        f"HEAD:{settings.branch}",
+                        check=False,
+                    )
+                    if proc.returncode != 0:
+                        err = self._redact(proc.stderr.strip(), settings)
+                        log_bus.error(f"Push failed: {err}")
+                        raise GitError(f"Push failed: {err}")
+                    log_bus.success(f"Pushed to origin/{settings.branch}.")
+                    return
                 log_bus.error(f"Push failed: {err}")
                 raise GitError(f"Push failed: {err}")
             log_bus.success(f"Pushed to origin/{settings.branch}.")
